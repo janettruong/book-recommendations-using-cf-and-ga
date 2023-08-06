@@ -14,7 +14,7 @@ We have reported our process of designing, implementing, and testing the system 
 # Guidelines
 [Our final Report](UEH500Report.pdf)
 
-[BLIGA system](Algorithm/main.py)
+[BLIGA](Algorithm/main.ipynb)
 
 [The UI for BLIGA](UI/main.py)
 
