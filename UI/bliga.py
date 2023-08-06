@@ -317,7 +317,7 @@ class BookRecommendationSystem:
                 best_solution = max((solution for solution in fitness_scores_dict if len(solution) > 2), key=lambda x: fitness_scores_dict[tuple(x)]["total_predicted_rating"])
             
         # Return the best solution, semratings_dict, fitness_scores_dict, and best_solutions_by_generation
-        return best_solution, semratings_dict, fitness_scores_dict, best_solutions_by_generation
+        return best_solution
 
     def plot_best_average_solutions_by_generation(self, fitness_scores_dict, best_solutions_by_generation):
         generations = list(best_solutions_by_generation.keys())
