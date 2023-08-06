@@ -7,12 +7,15 @@
 
 We modified the original BLIGA and tuned the hyperparameters. We also made some experiments to test the performance of the system.
 
-Then we implemented a hyperparameter combination with top performance in a UI. The UI design is based on that of [UEH Smart Digital Library][https://smartlib.ueh.edu.vn/], a key service of UEH University in Vietnam.
+Then we implemented a hyperparameter combination with top performance in a UI. The UI design is based on that of [UEH Smart Digital Library](https://smartlib.ueh.edu.vn/), a key service of UEH University in Vietnam.
 
 We have reported our process of designing, implementing, and testing in our final report.
 
 # Guidelines
 [Our final Report](UEH500Report.pdf)
+
 [BLIGA system](Algorithm/main.py)
+
 [The UI for BLIGA](UI/main.py)
+
 [Statistical Analysis of datasets](Algorithm/statistics.ipynb)
