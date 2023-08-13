@@ -1,12 +1,63 @@
-from PyQt5.QtWidgets import QApplication,QMainWindow, QTableWidgetItem, QLabel, QHBoxLayout, QWidget, QTableWidget
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt
+import typing
+from PyQt5.QtWidgets import QApplication,QMainWindow, QTableWidgetItem, QLabel, QHBoxLayout, QWidget, QTableWidget, QListWidgetItem, QMessageBox
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtGui import QPixmap, QMovie
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from GD import Ui_MainWindow
-from data_import import import_user_ratings, import_semantic, generate_random_user_ratings_input
+from data_import import import_user_ratings, import_semantic
 from bliga import BookRecommendationSystem
 import csv
 
+class BookRecommendationThread(QThread):
+    finished = pyqtSignal(object)
+
+    def __init__(self, user_ratings_input, user_ratings, semantic, pop_size, mutation_rate, num_generations, crossover_func, mutation_func, no_rec):
+        QThread.__init__(self)
+        self.user_ratings_input = user_ratings_input
+        self.user_ratings = user_ratings
+        self.semantic = semantic
+        self.pop_size = pop_size
+        self.mutation_rate = mutation_rate
+        self.num_generations = num_generations
+        self.crossover_func = crossover_func
+        self.mutation_func = mutation_func
+        self.no_rec = no_rec
+
+    def run(self):
+        recommender = BookRecommendationSystem(self.user_ratings_input, self.user_ratings, self.semantic)
+        best_solution = recommender.genetic_algorithm(
+            self.pop_size, self.mutation_rate, self.num_generations, self.crossover_func, self.mutation_func, self.no_rec
+        )
+        self.finished.emit(best_solution)
+class Loading(QWidget):
+    def __init__(self,mainwindow):
+        super().__init__(mainwindow)
+        
+        self.verticalLayout = QtWidgets.QVBoxLayout(self)
+        self.label_ani = QLabel(self)
+        self.movie = QMovie("load.gif")
+        self.label_ani.setMovie(self.movie)
+        self.setFixedSize(170,150)
+        self.verticalLayout.addWidget(self.label_ani, 0, QtCore.Qt.AlignHCenter)
+        self.setWindowFlags(QtCore.Qt.FramelessWindowHint)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
+        self.startani()
+        
+    def showEvent(self, event):
+        main_window_rect = self.parent().geometry()
+        loading_rect = self.geometry()
+        center_x = int(main_window_rect.center().x() - loading_rect.width() / 2)
+        center_y = int(main_window_rect.center().y() - loading_rect.height() / 2)
+        self.move(center_x, center_y)
+
+    def startani(self):
+        self.movie.start()
+
+    def stopani(self):
+        self.movie.stop()
+        self.close()
+
+         
 class StarRating(QWidget):
     def __init__(self, star_count=5):
         super().__init__()
@@ -73,10 +124,10 @@ class UI():
         self.main.input_userdata.setColumnWidth(0, 30)
         self.main.input_userdata.setColumnWidth(1, 400)
         self.main.input_userdata.setColumnWidth(2, 130)
-        self.main.input_userdata.setColumnWidth(3, 70)
+        self.main.input_userdata.setColumnWidth(3, 80)
         self.main.input_userdata.setColumnWidth(4, 180)
         self.main.input_userdata.setColumnWidth(5, 70)
-        self.main.input_userdata.setColumnWidth(6, 90)
+        self.main.input_userdata.setColumnWidth(6, 100)
         
 
     def display_books(self, file_path):
@@ -131,9 +182,9 @@ class UI():
                 self.main.input_userdata.setHorizontalHeaderItem(0, QTableWidgetItem("Book ID"))
                 self.main.input_userdata.setHorizontalHeaderItem(1, QTableWidgetItem("Book's Title"))
                 self.main.input_userdata.setHorizontalHeaderItem(2, QTableWidgetItem("Your Rating"))
-                self.main.input_userdata.setColumnWidth(0, 70)
-                self.main.input_userdata.setColumnWidth(1, 700)
-                self.main.input_userdata.setColumnWidth(2, 170)
+                self.main.input_userdata.setColumnWidth(0, 80)
+                self.main.input_userdata.setColumnWidth(1, 730)
+                self.main.input_userdata.setColumnWidth(2, 220)
                 self.main.input_userdata.verticalHeader().setVisible(False)
                 self.first_click = False
             book_id = self.get_book_id(selected_book)
@@ -162,6 +213,13 @@ class UI():
         self.main.input_userdata.setItem(row_count, 0, item)
         
     def get_input_data(self):
+        if self.main.input_userdata.rowCount() < 5:
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Warning)
+            msg.setText("You need to select at least 5 books!")
+            msg.setWindowTitle("Warning")
+            msg.exec_()
+            return
         input_data = []
         total = self.read_titles_from_csv("BOOKS.csv")
         for i in range(len(total)):
@@ -185,20 +243,45 @@ class UI():
         semantic = import_semantic(semantic_file)
         user_ratings_input = input_data
         
-        
-        recommender = BookRecommendationSystem(user_ratings_input, user_ratings, semantic)
-
-        # Set the parameters for the genetic algorithm
-        pop_size = 50
-        mutation_rate = 0.2
-        num_generations = 10
+        pop_size = 50   
+        mutation_rate = 0.1
+        num_generations = 5
         crossover_func = "one_point"
         mutation_func = "swap"
         no_rec = 10
         
-        best_solution = recommender.genetic_algorithm(
-    pop_size, mutation_rate, num_generations, crossover_func, mutation_func, no_rec
-)
+        self.loading = Loading(self.mainUI)
+        self.loading.startani()
+        self.loading.show()
+        self.recommendation_thread = BookRecommendationThread(user_ratings_input, user_ratings, semantic, pop_size, mutation_rate, num_generations, crossover_func, mutation_func, no_rec)
+        self.recommendation_thread.finished.connect(self.on_recommendation_finished)
+        self.recommendation_thread.start()
+
+    def get_book_titles(self, book_id):
+        with open('BOOKS.csv', 'r') as csvfile:
+            csvreader = csv.reader(csvfile)
+            header = next(csvreader)
+            for row_data in csvreader:
+                if row_data[0] == book_id:
+                    return row_data[1]
+        return None
+
+    
+    def on_recommendation_finished(self, best_solution):
+        self.loading.stopani()
+        self.main.output_bookrcm.setColumnCount(2)
+        self.main.output_bookrcm.setHorizontalHeaderItem(0, QTableWidgetItem("Book ID"))
+        self.main.output_bookrcm.setHorizontalHeaderItem(1, QTableWidgetItem("Book's Title"))
+        self.main.output_bookrcm.setColumnWidth(1, 900)
+        self.main.output_bookrcm.verticalHeader().setVisible(False)
+        recommended_books = best_solution  
+        for book in recommended_books:
+            titles = self.get_book_titles(str(book+1))
+            row = self.main.output_bookrcm.rowCount()
+            self.main.output_bookrcm.insertRow(row)
+            self.main.output_bookrcm.setItem(row,0,QTableWidgetItem(str(book+1)))
+            self.main.output_bookrcm.setItem(row,1,QTableWidgetItem(str(titles)))
+            print(book)
 
         
                 
